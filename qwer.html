@@ -1,0 +1,1152 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101719">
+  <title>STACK / Tetris</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #101719;
+      --panel: #172224;
+      --panel-hi: #202e30;
+      --line: #304143;
+      --paper: #f1f2e9;
+      --muted: #95a8a4;
+      --mint: #b9f45b;
+      --orange: #ff8657;
+      --cell: 30px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--paper);
+      background-color: var(--ink);
+      background-image: radial-gradient(#354345 0.7px, transparent 0.7px);
+      background-size: 18px 18px;
+      font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    button { font: inherit; }
+    .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+    .shell.ko-shake { animation: ko-shake .62s cubic-bezier(.36,.07,.19,.97) both; }
+    body.ko-impact::after { content: ""; position: fixed; z-index: 20; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 36%, rgba(255, 55, 69, .28) 100%); animation: ko-flash .62s ease-out both; }
+    @keyframes ko-shake {
+      0%, 100% { transform: translate3d(0, 0, 0) rotate(0); }
+      12% { transform: translate3d(-10px, 4px, 0) rotate(-.45deg); }
+      24% { transform: translate3d(9px, -5px, 0) rotate(.4deg); }
+      36% { transform: translate3d(-7px, 3px, 0) rotate(-.3deg); }
+      48% { transform: translate3d(6px, -3px, 0) rotate(.25deg); }
+      62% { transform: translate3d(-4px, 2px, 0) rotate(-.15deg); }
+      76% { transform: translate3d(3px, -1px, 0); }
+      90% { transform: translate3d(-1px, 1px, 0); }
+    }
+    @keyframes ko-flash {
+      0% { opacity: 0; }
+      12% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .shell.ko-shake, body.ko-impact::after { animation: none; }
+    }
+    header {
+      min-height: 76px; padding: 0 clamp(18px, 5vw, 72px);
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #293739; background: rgba(16, 23, 25, .94);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-mark { display: grid; grid-template-columns: repeat(2, 9px); gap: 3px; transform: rotate(-8deg); }
+    .brand-mark i { width: 9px; height: 9px; display: block; background: var(--mint); }
+    .brand-mark i:nth-child(2), .brand-mark i:nth-child(3) { background: var(--orange); }
+    .brand-name { font-weight: 900; letter-spacing: .08em; font-size: 17px; }
+    .brand-name span { color: var(--mint); }
+    .edition { font-size: 11px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+    main { display: grid; place-items: center; padding: 24px 16px 28px; }
+    .game-layout { width: min(100%, 1120px); display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 18px; justify-content: center; align-items: start; }
+    .arena { min-width: 0; }
+    .round-banner { margin: 0 auto 10px; width: min(100%, 612px); display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .round-banner strong { color: var(--mint); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .boards { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 12px; justify-content: center; }
+    .board-column { min-width: 0; }
+    .board-heading { min-height: 34px; margin-bottom: 7px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .board-name { color: var(--paper); font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .board-name.bot { color: var(--orange); }
+    .battle-stat { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .battle-stat strong { margin-left: 3px; color: var(--paper); font-size: 13px; }
+    .attack-meter { min-height: 18px; margin: 6px 0 7px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .attack-meter strong { color: var(--orange); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .attack-meter .outgoing { color: var(--mint); }
+    .redline { position: absolute; z-index: 2; top: auto; right: 0; bottom: 0; width: 4px; height: 0; background: #ff4f5e; box-shadow: 0 0 10px #ff4f5ecc; pointer-events: none; transition: height .22s ease; }
+    .redline span { position: absolute; right: 7px; top: -17px; color: #ff7380; font-size: 8px; font-weight: 900; letter-spacing: .12em; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); opacity: 0; transition: opacity .22s ease; }
+    .redline.active span { opacity: 1; }
+    .bot-status { min-height: 16px; margin-top: 7px; color: var(--orange); font-size: 10px; font-weight: 800; text-align: center; letter-spacing: .12em; text-transform: uppercase; }
+    .board-wrap { position: relative; width: 100%; aspect-ratio: 1 / 2; background: #11191b; border: 1px solid #435456; box-shadow: 0 16px 60px #0008, 5px 5px 0 #273638; overflow: hidden; }
+    .board-wrap.hard-drop-shake { animation: hard-drop-shake .2s ease-out; }
+    @keyframes hard-drop-shake {
+      0%, 100% { transform: translateX(0); }
+      30% { transform: translateX(-3px); }
+      60% { transform: translateX(3px); }
+      85% { transform: translateX(-1px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .board-wrap.hard-drop-shake { animation: none; }
+    }
+    #board { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+    #bot-board { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+    .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; background: rgba(11, 17, 18, .78); backdrop-filter: blur(3px); }
+    .overlay[hidden] { display: none; }
+    .overlay-content { max-width: 230px; }
+    .eyebrow { margin: 0 0 9px; color: var(--mint); font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .overlay h1 { margin: 0; font-size: clamp(34px, 8vw, 46px); line-height: .95; font-weight: 900; text-transform: uppercase; }
+    .overlay p { margin: 15px 0 20px; color: #b6c4bf; line-height: 1.5; font-size: 14px; }
+    .primary { border: 0; padding: 12px 20px; color: #182018; background: var(--mint); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; box-shadow: 3px 3px 0 #76983e; }
+    .primary:hover { background: #d0ff88; transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #76983e; }
+    .side { display: grid; gap: 12px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat, .mini-panel { border: 1px solid var(--line); background: rgba(23, 34, 36, .96); }
+    .stat { padding: 12px 13px 10px; min-width: 0; }
+    .stat-label, .panel-label { display: block; color: var(--muted); text-transform: uppercase; font-weight: 800; font-size: 10px; letter-spacing: .13em; }
+    .stat-value { display: block; margin-top: 5px; overflow: hidden; color: var(--paper); font-variant-numeric: tabular-nums; font-size: 24px; line-height: 1; font-weight: 800; }
+    .mini-panel { padding: 12px; }
+    .panel-label { margin-bottom: 10px; }
+    .difficulty-select { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid #435456; color: var(--paper); background: #202e30; font: inherit; font-size: 12px; font-weight: 800; text-align: center; text-align-last: center; }
+    .difficulty-panel .panel-label { text-align: center; }
+    .difficulty-select:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+    .preview-row { display: flex; gap: 10px; justify-content: center; align-items: center; }
+    .preview-box { width: 75px; height: 64px; display: grid; place-items: center; background: #11191b; border: 1px solid #29383a; }
+    .preview-box canvas { width: 68px; height: 58px; image-rendering: pixelated; }
+    .next-list { width: 82px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; align-items: center; justify-items: center; }
+    .next-list canvas { width: 38px; height: 24px; image-rendering: pixelated; }
+    .next-list canvas:first-child { grid-column: 1 / -1; width: 72px; height: 44px; }
+    .hold-empty { color: #687b77; font-size: 11px; font-weight: 700; text-align: center; }
+    .controls { display: grid; gap: 8px; }
+    .control-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #b1bfba; font-size: 12px; }
+    kbd { min-width: 27px; padding: 4px 6px; display: inline-block; text-align: center; color: var(--paper); background: #29383a; border: 1px solid #405153; border-bottom-width: 2px; font: 800 10px Bahnschrift, "Segoe UI", sans-serif; }
+    .key-group { display: flex; gap: 4px; }
+    .actions { display: grid; grid-template-columns: 1fr 40px; gap: 8px; }
+    .action-button { min-height: 38px; border: 1px solid #435456; color: var(--paper); background: #202e30; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
+    .action-button:hover { border-color: var(--mint); color: var(--mint); }
+    .action-button:focus-visible, .primary:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+    footer { padding: 12px 20px; text-align: center; color: #728581; border-top: 1px solid #293739; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    @media (max-width: 560px) {
+      header { min-height: 60px; }
+      main { padding: 14px 12px 18px; }
+      .game-layout { grid-template-columns: 1fr; gap: 14px; }
+      .boards { gap: 9px; }
+      .side { gap: 8px; }
+      .stat { padding: 9px 8px 8px; }
+      .stat-value { font-size: 20px; }
+      .mini-panel { padding: 9px; }
+      .preview-row { gap: 5px; }
+      .preview-box { width: 58px; }
+      .next-list canvas { width: 43px; }
+      .control-row { font-size: 10px; }
+      .edition { font-size: 9px; }
+    }
+    @media (max-width: 370px) {
+      .game-layout { grid-template-columns: 1fr; gap: 10px; }
+      .boards { gap: 7px; }
+      .stat-label, .panel-label { font-size: 9px; }
+      .stat-value { font-size: 18px; }
+      .preview-box { width: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div class="brand-name">STACK<span>/</span></div></div>
+      <div class="edition">A falling-block classic</div>
+    </header>
+    <main>
+      <div class="game-layout">
+        <div class="arena">
+          <div class="round-banner"><span>Knock Out · First to 3</span><span>Time <strong id="match-clock">2:00</strong></span><span>Round <strong id="round-number">1</strong> · Set <strong id="round-wins">0 - 0</strong></span></div>
+          <div class="boards">
+            <div class="board-column">
+              <div class="board-heading"><span class="board-name">You</span><span class="battle-stat">Lines <strong id="lines">0</strong> · Combo <strong id="combo">0</strong></span></div>
+              <div class="attack-meter"><span>Garbage queued <strong id="garbage">0</strong></span><span>Attack <strong class="outgoing" id="attack">0</strong></span></div>
+              <section class="board-wrap" aria-label="Your Tetris game board">
+                <canvas id="board" width="300" height="600" aria-label="Your game board, 10 columns by 20 rows"></canvas>
+                <div class="redline" id="redline" aria-hidden="true"><span>REDLINE</span></div>
+                <div class="overlay" id="overlay">
+                  <div class="overlay-content">
+                    <p class="eyebrow" id="overlay-eyebrow">Ready when you are</p>
+                    <h1 id="overlay-title">Stack<br>smart.</h1>
+                    <p id="overlay-copy">Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.</p>
+                    <button class="primary" id="start-button" type="button">Start knockout</button>
+                  </div>
+                </div>
+              </section>
+              <div class="bot-status" id="match-status" aria-live="polite">Ready for battle</div>
+            </div>
+            <div class="board-column">
+              <div class="board-heading"><span class="board-name bot">Bot / 01</span><span class="battle-stat">Lines <strong id="bot-lines">0</strong> · Combo <strong id="bot-combo">0</strong></span></div>
+              <div class="attack-meter"><span>Garbage queued <strong id="bot-garbage">0</strong></span><span>Attack <strong class="outgoing" id="bot-attack">0</strong></span></div>
+              <section class="board-wrap" aria-label="Bot Tetris game board">
+                <canvas id="bot-board" width="300" height="600" aria-label="Bot game board, 10 columns by 20 rows"></canvas>
+                <div class="redline" id="bot-redline" aria-hidden="true"><span>REDLINE</span></div>
+              </section>
+              <div class="bot-status" id="bot-status">Waiting</div>
+            </div>
+          </div>
+        </div>
+        <aside class="side" aria-label="Game information">
+          <div class="stats">
+            <div class="stat"><span class="stat-label">Your score</span><strong class="stat-value" id="score">0</strong></div>
+            <div class="stat"><span class="stat-label">Bot score</span><strong class="stat-value" id="bot-score">0</strong></div>
+            <div class="stat"><span class="stat-label">Best</span><strong class="stat-value" id="best">0</strong></div>
+            <div class="stat"><span class="stat-label">Level</span><strong class="stat-value" id="level">1</strong></div>
+          </div>
+          <section class="mini-panel">
+            <span class="panel-label">Hold / next</span>
+            <div class="preview-row">
+              <div class="preview-box" id="hold-box"><canvas id="hold-preview" width="80" height="64"></canvas><span class="hold-empty" id="hold-empty">EMPTY</span></div>
+              <div class="next-list"><canvas id="next-1" width="68" height="42"></canvas><canvas id="next-2" width="68" height="42"></canvas><canvas id="next-3" width="68" height="42"></canvas></div>
+            </div>
+          </section>
+          <section class="mini-panel difficulty-panel">
+            <label class="panel-label" for="ai-difficulty">AI difficulty</label>
+            <select class="difficulty-select" id="ai-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+              <option value="expert">Expert</option>
+            </select>
+          </section>
+          <section class="mini-panel controls">
+            <span class="panel-label">Controls</span>
+            <div class="control-row"><span>Move</span><span class="key-group"><kbd>←</kbd><kbd>→</kbd></span></div>
+            <div class="control-row"><span>Soft drop</span><kbd>↓</kbd></div>
+            <div class="control-row"><span>Rotate</span><kbd>↑</kbd></div>
+            <div class="control-row"><span>Hard drop</span><kbd>SPACE</kbd></div>
+            <div class="control-row"><span>Hold / swap</span><kbd>SHIFT</kbd></div>
+            <div class="control-row"><span>Pause</span><kbd>ESC</kbd></div>
+          </section>
+          <div class="actions"><button class="action-button" id="pause-button" type="button" aria-label="Pause game">Pause</button><button class="action-button" id="restart-button" type="button" aria-label="Restart game" title="Restart">↻</button></div>
+        </aside>
+      </div>
+    </main>
+    <footer>Two-minute battle · T-Spins, combos & big clears boost attacks</footer>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const COLS = 10;
+      const ROWS = 20;
+      const SIZE = 30;
+      const COLORS = { I: '#45d9cf', O: '#ffd34f', T: '#bb8cff', S: '#b9f45b', Z: '#ff6e67', J: '#5b9dff', L: '#ff995b', G: '#83918c' };
+      const SHAPES = {
+        I: [[1, 1, 1, 1]], O: [[1, 1], [1, 1]], T: [[0, 1, 0], [1, 1, 1]],
+        S: [[0, 1, 1], [1, 1, 0]], Z: [[1, 1, 0], [0, 1, 1]],
+        J: [[1, 0, 0], [1, 1, 1]], L: [[0, 0, 1], [1, 1, 1]]
+      };
+      const boardCanvas = document.querySelector('#board');
+      const ctx = boardCanvas.getContext('2d');
+      const botCanvas = document.querySelector('#bot-board');
+      const botCtx = botCanvas.getContext('2d');
+      const playerBoardWrap = boardCanvas.parentElement;
+      const overlay = document.querySelector('#overlay');
+      const shell = document.querySelector('.shell');
+      const startButton = document.querySelector('#start-button');
+      const pauseButton = document.querySelector('#pause-button');
+        const difficultySelect = document.querySelector('#ai-difficulty');
+      const scoreNode = document.querySelector('#score');
+      const botScoreNode = document.querySelector('#bot-score');
+      const bestNode = document.querySelector('#best');
+      const linesNode = document.querySelector('#lines');
+      const botLinesNode = document.querySelector('#bot-lines');
+      const levelNode = document.querySelector('#level');
+      const matchStatus = document.querySelector('#match-status');
+      const botStatus = document.querySelector('#bot-status');
+      const comboNode = document.querySelector('#combo');
+      const botComboNode = document.querySelector('#bot-combo');
+      const garbageNode = document.querySelector('#garbage');
+      const botGarbageNode = document.querySelector('#bot-garbage');
+      const attackNode = document.querySelector('#attack');
+      const botAttackNode = document.querySelector('#bot-attack');
+      const redline = document.querySelector('#redline');
+      const botRedline = document.querySelector('#bot-redline');
+      const matchClockNode = document.querySelector('#match-clock');
+      const roundNumberNode = document.querySelector('#round-number');
+      const roundWinsNode = document.querySelector('#round-wins');
+      const holdCanvas = document.querySelector('#hold-preview');
+      const holdCtx = holdCanvas.getContext('2d');
+      const holdEmpty = document.querySelector('#hold-empty');
+      const nextCanvases = [1, 2, 3].map((number) => document.querySelector(`#next-${number}`));
+      let board, current, bag, queue, held, holdUsed, score, lines, level, best, running, paused, lastTime, dropElapsed;
+      const heldKeys = new Set();
+      let heldHorizontal = 0;
+      let horizontalElapsed = 0;
+      let horizontalRepeating = false;
+      let softDropElapsed = 0;
+      let botBoard, botBag, botQueue, botCurrent, botScore, botLines, botElapsed, botDropElapsed;
+      let botTargetX, botTargetShape, botHeld, botHoldUsed, botActionElapsed;
+      let playerFallAnimation = null;
+      let botFallAnimation = null;
+      let lineClearEffects = [];
+      let playerWins = 0;
+      let botWins = 0;
+      let roundNumber = 0;
+      let matchComplete = false;
+      let combo = 0;
+      let botCombo = 0;
+      let pendingGarbage = 0;
+      let botPendingGarbage = 0;
+      let lastAttack = 0;
+      let botLastAttack = 0;
+      let backToBack = false;
+      let botBackToBack = false;
+      let matchElapsed = 0;
+      let matchPlayerScore = 0;
+      let matchBotScore = 0;
+      let matchPlayerLines = 0;
+      let matchBotLines = 0;
+      const MATCH_LENGTH = 240000;
+      const AI_DIFFICULTIES = {
+        easy: { lineScale: 0.72, heightPenalty: 0.25, holePenalty: 2.4, bumpPenalty: 0.42, choicePool: 0.4, dropInterval: 90 },
+        medium: { lineScale: 1, heightPenalty: 0.48, holePenalty: 5.2, bumpPenalty: 0.72, noise: 0, dropInterval: 42 },
+        hard: { lineScale: 1.18, heightPenalty: 0.55, holePenalty: 7.5, bumpPenalty: 0.85, noise: 0, dropInterval: 34 },
+        expert: { lineScale: 1.35, heightPenalty: 0.62, holePenalty: 10, bumpPenalty: 1, noise: 0, dropInterval: 27 }
+      };
+        const difficulty = AI_DIFFICULTIES[difficultySelect.value];
+      best = Number(localStorage.getItem('stack-tetris-best') || 0);
+      bestNode.textContent = String(best);
+
+        const candidates = [];
+      function clearHeldControls() {
+        heldKeys.clear();
+        heldHorizontal = 0;
+        horizontalElapsed = 0;
+        horizontalRepeating = false;
+        softDropElapsed = 0;
+      }
+
+      function remainingHorizontal() {
+        let direction = 0;
+        for (const key of heldKeys) {
+          if (key === 'ArrowLeft') direction = -1;
+          if (key === 'ArrowRight') direction = 1;
+        }
+        return direction;
+      }
+
+      function makeBag() {
+        const pieces = Object.keys(SHAPES);
+        for (let index = pieces.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          [pieces[index], pieces[swapIndex]] = [pieces[swapIndex], pieces[index]];
+        }
+        return pieces;
+      }
+      function nextType() {
+        if (!bag.length) bag = makeBag();
+        return bag.pop();
+      }
+      function nextBotType() {
+        if (!botBag.length) botBag = makeBag();
+        return botBag.pop();
+      }
+      function makePiece(type) {
+        const shape = SHAPES[type].map((row) => row.slice());
+        return { type, shape, x: Math.floor((COLS - shape[0].length) / 2), y: 0, lastRotate: false };
+      }
+      function isTSpin(piece, field) {
+        if (piece.type !== 'T' || !piece.lastRotate) return false;
+        const pivotX = piece.x + 1;
+        const pivotY = piece.y + 1;
+        let occupiedCorners = 0;
+        for (const dx of [-1, 1]) {
+          for (const dy of [-1, 1]) {
+            const x = pivotX + dx;
+            const y = pivotY + dy;
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS || field[y][x]) occupiedCorners++;
+          }
+        }
+        return occupiedCorners >= 3;
+      }
+      function renderClock() {
+        const secondsLeft = Math.ceil(Math.max(0, MATCH_LENGTH - matchElapsed) / 1000);
+        matchClockNode.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
+      }
+      function botCollides(piece, dx, dy, shape, field = botBoard) {
+        for (let row = 0; row < shape.length; row++) {
+          for (let col = 0; col < shape[row].length; col++) {
+            if (!shape[row][col]) continue;
+            const x = piece.x + col + dx;
+            const y = piece.y + row + dy;
+            if (x < 0 || x >= COLS || y >= ROWS || (y >= 0 && field[y][x])) return true;
+          }
+        }
+        return false;
+      }
+      function scoreBotPlacement(field, type) {
+        let best = -Infinity;
+        let bestMove = null;
+        const seen = new Set();
+        candidates.length = 0;
+        let shape = SHAPES[type].map((row) => row.slice());
+        for (let rotation = 0; rotation < 4; rotation++) {
+          const shapeKey = shape.map((row) => row.join('')).join('/');
+          if (!seen.has(shapeKey)) {
+            seen.add(shapeKey);
+            for (let x = 0; x <= COLS - shape[0].length; x++) {
+              const piece = { type, shape, x, y: 0 };
+              if (botCollides(piece, 0, 0, shape, field)) continue;
+              while (!botCollides(piece, 0, 1, shape, field)) piece.y++;
+              const result = field.map((row) => row.slice());
+              shape.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+                if (cell) result[piece.y + rowIndex][x + colIndex] = type;
+              }));
+              const cleared = result.filter((row) => row.every(Boolean)).length;
+              const remaining = result.filter((row) => !row.every(Boolean));
+              while (remaining.length < ROWS) remaining.unshift(Array(COLS).fill(null));
+              let aggregateHeight = 0;
+              let holes = 0;
+              const heights = [];
+              for (let col = 0; col < COLS; col++) {
+                let top = ROWS;
+                for (let row = 0; row < ROWS; row++) {
+                  if (remaining[row][col]) { top = row; break; }
+                }
+                const height = ROWS - top;
+                heights.push(height);
+                aggregateHeight += height;
+                for (let row = top; row < ROWS; row++) if (!remaining[row][col]) holes++;
+              }
+              let bumpiness = 0;
+              for (let col = 0; col < COLS - 1; col++) bumpiness += Math.abs(heights[col] - heights[col + 1]);
+              const lineReward = [0, 1, 4, 8, 13][cleared] * difficulty.lineScale;
+              const value = lineReward - aggregateHeight * difficulty.heightPenalty - holes * difficulty.holePenalty - bumpiness * difficulty.bumpPenalty;
+              const move = { x, shape: shape.map((row) => row.slice()) };
+              candidates.push({ value, move });
+              if (value > best) {
+                best = value;
+                bestMove = move;
+              }
+            }
+          }
+          shape = rotate(shape, 1);
+        }
+        if (difficulty.choicePool && candidates.length) {
+          candidates.sort((first, second) => second.value - first.value);
+          const poolSize = Math.max(1, Math.ceil(candidates.length * difficulty.choicePool));
+          return candidates[Math.floor(Math.random() * poolSize)].move;
+        }
+        return bestMove;
+      }
+      function spawnBotPiece() {
+        botCurrent = makePiece(botQueue.shift());
+        botQueue.push(nextBotType());
+        botHoldUsed = false;
+        if (!botHoldUsed && (botHeld === null ? ['S', 'Z'].includes(botCurrent.type) && ['I', 'T'].includes(botQueue[0]) : ['S', 'Z'].includes(botCurrent.type) && ['I', 'T'].includes(botHeld))) {
+          if (botHeld === null) {
+            botHeld = botCurrent.type;
+            botCurrent = makePiece(botQueue.shift());
+            botQueue.push(nextBotType());
+          } else {
+            [botHeld, botCurrent] = [botCurrent.type, makePiece(botHeld)];
+          }
+          botHoldUsed = true;
+          botStatus.textContent = 'Swapping';
+        }
+        const plan = scoreBotPlacement(botBoard, botCurrent.type);
+        if (!plan || botCollides(botCurrent, 0, 0, botCurrent.shape)) {
+          endGame('YOU WIN');
+          return;
+        }
+        botTargetX = plan.x;
+        botTargetShape = plan.shape;
+        botCurrent.y = 0;
+        botElapsed = 0;
+        botDropElapsed = 0;
+        botActionElapsed = 0;
+        botStatus.textContent = 'Calculating';
+      }
+      function resetGame(resetMatch = false) {
+        playerFallAnimation = null;
+        botFallAnimation = null;
+        lineClearEffects = [];
+        if (resetMatch) {
+          playerWins = 0;
+          botWins = 0;
+          roundNumber = 0;
+          matchComplete = false;
+          matchElapsed = 0;
+          matchPlayerScore = 0;
+          matchBotScore = 0;
+          matchPlayerLines = 0;
+          matchBotLines = 0;
+        }
+        clearHeldControls();
+        board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        bag = [];
+        queue = [nextType(), nextType(), nextType()];
+        held = null;
+        holdUsed = false;
+        score = 0;
+        lines = 0;
+        level = 1;
+        combo = 0;
+        botCombo = 0;
+        pendingGarbage = 0;
+        botPendingGarbage = 0;
+        lastAttack = 0;
+        botLastAttack = 0;
+        backToBack = false;
+        botBackToBack = false;
+        comboNode.textContent = '0';
+        botComboNode.textContent = '0';
+        updateBattleMeters();
+        dropElapsed = 0;
+        lastTime = 0;
+        botBoard = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        botBag = [];
+        botQueue = [nextBotType(), nextBotType(), nextBotType()];
+        botScore = 0;
+        botLines = 0;
+        botElapsed = 0;
+        botDropElapsed = 0;
+        botActionElapsed = 0;
+        botTargetX = 0;
+        botTargetShape = null;
+        botHeld = null;
+        botHoldUsed = false;
+        running = true;
+        paused = false;
+        spawnPiece();
+        spawnBotPiece();
+        updateBotStats();
+        updateStats();
+        renderClock();
+        matchStatus.textContent = 'Battle in progress';
+        botStatus.textContent = 'Calculating';
+        roundNumberNode.textContent = String(Math.min(roundNumber + 1, 5));
+        roundWinsNode.textContent = `${playerWins} - ${botWins}`;
+        overlay.hidden = true;
+        pauseButton.textContent = 'Pause';
+        draw();
+      }
+      function spawnPiece() {
+        current = makePiece(queue.shift());
+        queue.push(nextType());
+        holdUsed = false;
+        drawPreviews();
+        if (collides(current, 0, 0, current.shape)) endGame();
+      }
+      function collides(piece, dx, dy, shape) {
+        for (let row = 0; row < shape.length; row++) {
+          for (let col = 0; col < shape[row].length; col++) {
+            if (!shape[row][col]) continue;
+            const x = piece.x + col + dx;
+            const y = piece.y + row + dy;
+            if (x < 0 || x >= COLS || y >= ROWS || (y >= 0 && board[y][x])) return true;
+          }
+        }
+        return false;
+      }
+      function rotate(matrix, direction) {
+        const height = matrix.length;
+        const width = matrix[0].length;
+        const turned = Array.from({ length: width }, () => Array(height).fill(0));
+        for (let row = 0; row < height; row++) {
+          for (let col = 0; col < width; col++) {
+            turned[direction > 0 ? col : width - 1 - col][direction > 0 ? height - 1 - row : row] = matrix[row][col];
+          }
+        }
+        return turned;
+      }
+      function tryRotate(direction) {
+        const turned = rotate(current.shape, direction);
+        for (const offset of [0, -1, 1, -2, 2]) {
+          if (!collides(current, offset, 0, turned)) {
+            current.x += offset;
+            current.shape = turned;
+            current.lastRotate = true;
+            draw();
+            return;
+          }
+        }
+      }
+      function move(dx, dy) {
+        if (!collides(current, dx, dy, current.shape)) {
+          current.x += dx;
+          current.y += dy;
+          if (dx) current.lastRotate = false;
+          if (dy) { score += 1; updateStats(); }
+          draw();
+          return true;
+        }
+        if (dy) lockPiece();
+        return false;
+      }
+      function hardDrop() {
+        let distance = 0;
+        while (!collides(current, 0, 1, current.shape)) {
+          current.y++;
+          distance++;
+        }
+        score += distance * 2;
+        lockPiece();
+        playerBoardWrap.classList.remove('hard-drop-shake');
+        void playerBoardWrap.offsetWidth;
+        playerBoardWrap.classList.add('hard-drop-shake');
+      }
+      function holdPiece() {
+        if (holdUsed) return;
+        const outgoing = current.type;
+        if (held === null) {
+          held = outgoing;
+          spawnPiece();
+        } else {
+          const incoming = held;
+          held = outgoing;
+          current = makePiece(incoming);
+          drawPreviews();
+          if (collides(current, 0, 0, current.shape)) endGame();
+        }
+        holdUsed = true;
+        drawPreviews();
+        draw();
+      }
+      function lockPiece() {
+        const wasTSpin = isTSpin(current, board);
+        for (let row = 0; row < current.shape.length; row++) {
+          for (let col = 0; col < current.shape[row].length; col++) {
+            if (!current.shape[row][col]) continue;
+            const y = current.y + row;
+            if (y < 0) { endGame(); return; }
+            board[y][current.x + col] = current.type;
+          }
+        }
+        const clearRows = board.reduce((rows, row, index) => {
+          if (row.every(Boolean)) rows.push(index);
+          return rows;
+        }, []);
+        if (clearRows.length > 0) {
+          lineClearEffects.push({ owner: 'player', rows: clearRows, elapsed: 0 });
+        }
+        finishPlayerLock(clearRows, wasTSpin);
+      }
+      function finishPlayerLock(clearRows, wasTSpin) {
+        const cleared = clearRows.length;
+        const clearSet = new Set(clearRows);
+        board = board.filter((_, index) => !clearSet.has(index));
+        while (board.length < ROWS) board.unshift(Array(COLS).fill(null));
+        if (cleared) {
+          combo++;
+          const difficultClear = cleared === 4 || wasTSpin;
+          const backToBackBonus = difficultClear && backToBack ? 1 : 0;
+          backToBack = difficultClear;
+          lines += cleared;
+          score += [0, 100, 300, 500, 800][cleared] * level + (wasTSpin ? 400 : 0);
+          level = Math.floor(lines / 10) + 1;
+          const comboBonus = combo >= 2 ? Math.min(4, combo - 1) : 0;
+          const attack = attackValue(cleared, wasTSpin) + comboBonus + backToBackBonus;
+          defendAgainstGarbage(cleared, true);
+          sendAttack(attack, true);
+          if (!running) return;
+        } else {
+          combo = 0;
+          if (wasTSpin) score += 100;
+        }
+        updateStats();
+        comboNode.textContent = String(combo);
+        applyPendingGarbage(true);
+        if (!running) return;
+        spawnPiece();
+        draw();
+      }
+      function updateStats() {
+        scoreNode.textContent = String(score);
+        linesNode.textContent = String(lines);
+        levelNode.textContent = String(level);
+        if (score > best) {
+          best = score;
+          bestNode.textContent = String(best);
+          localStorage.setItem('stack-tetris-best', String(best));
+        }
+      }
+      function updateBotStats() {
+        botScoreNode.textContent = String(botScore);
+        botLinesNode.textContent = String(botLines);
+      }
+      function updateBattleMeters() {
+        garbageNode.textContent = String(pendingGarbage);
+        botGarbageNode.textContent = String(botPendingGarbage);
+        attackNode.textContent = String(lastAttack);
+        botAttackNode.textContent = String(botLastAttack);
+        updateRedline(redline, pendingGarbage);
+        updateRedline(botRedline, botPendingGarbage);
+      }
+      function updateRedline(node, garbage) {
+        const height = Math.min(ROWS, garbage) / ROWS * 100;
+        node.style.height = `${height}%`;
+        node.classList.toggle('active', garbage > 0);
+      }
+      function attackValue(cleared, wasTSpin) {
+        if (wasTSpin) return [0, 2, 4, 6][cleared] || 0;
+        return [0, 0, 1, 2, 4][cleared] || 0;
+      }
+      function defendAgainstGarbage(cleared, fromPlayer) {
+        const pending = fromPlayer ? pendingGarbage : botPendingGarbage;
+        const cancelled = Math.min(pending, cleared);
+        if (fromPlayer) pendingGarbage -= cancelled;
+        else botPendingGarbage -= cancelled;
+        updateBattleMeters();
+      }
+      function applyPendingGarbage(toPlayer) {
+        const amount = toPlayer ? pendingGarbage : botPendingGarbage;
+        if (!amount) return;
+        const target = toPlayer ? board : botBoard;
+        for (let row = 0; row < amount; row++) {
+          if (target[0].some(Boolean)) {
+            endGame(toPlayer ? 'BOT WINS' : 'YOU WIN');
+            return;
+          }
+          target.shift();
+          const hole = Math.floor(Math.random() * COLS);
+          target.push(Array.from({ length: COLS }, (_, col) => col === hole ? null : 'G'));
+        }
+        if (toPlayer) pendingGarbage = 0;
+        else botPendingGarbage = 0;
+        updateBattleMeters();
+      }
+      function sendAttack(attack, fromPlayer) {
+        if (!attack || !running) return;
+        if (fromPlayer) {
+          botPendingGarbage += attack;
+          lastAttack = attack;
+          botStatus.textContent = `${attack} garbage queued`;
+        } else {
+          pendingGarbage += attack;
+          botLastAttack = attack;
+          matchStatus.textContent = `${attack} garbage queued`;
+        }
+        updateBattleMeters();
+        draw();
+        drawBot();
+      }
+      function lockBotPiece() {
+        for (let row = 0; row < botCurrent.shape.length; row++) {
+          for (let col = 0; col < botCurrent.shape[row].length; col++) {
+            if (!botCurrent.shape[row][col]) continue;
+            const y = botCurrent.y + row;
+            if (y < 0) { endGame('YOU WIN'); return; }
+            botBoard[y][botCurrent.x + col] = botCurrent.type;
+          }
+        }
+        const clearRows = botBoard.reduce((rows, row, index) => {
+          if (row.every(Boolean)) rows.push(index);
+          return rows;
+        }, []);
+        if (clearRows.length > 0) {
+          lineClearEffects.push({ owner: 'bot', rows: clearRows, elapsed: 0 });
+        }
+        finishBotLock(clearRows);
+      }
+      function finishBotLock(clearRows) {
+        const cleared = clearRows.length;
+        const clearSet = new Set(clearRows);
+        botBoard = botBoard.filter((_, index) => !clearSet.has(index));
+        while (botBoard.length < ROWS) botBoard.unshift(Array(COLS).fill(null));
+        botScore += [0, 100, 300, 500, 800][cleared] + 2 * botCurrent.y;
+        if (cleared) {
+          botCombo++;
+          const difficultClear = cleared === 4;
+          const backToBackBonus = difficultClear && botBackToBack ? 1 : 0;
+          botBackToBack = difficultClear;
+          botLines += cleared;
+          const comboBonus = botCombo >= 2 ? Math.min(4, botCombo - 1) : 0;
+          const attack = attackValue(cleared, false) + comboBonus + backToBackBonus;
+          defendAgainstGarbage(cleared, false);
+          sendAttack(attack, false);
+        } else botCombo = 0;
+        updateBotStats();
+        botComboNode.textContent = String(botCombo);
+        applyPendingGarbage(false);
+        if (running) spawnBotPiece();
+        drawBot();
+      }
+      function shapesMatch(first, second) {
+        return first && second && first.length === second.length && first.every((row, rowIndex) => row.join('') === second[rowIndex].join(''));
+      }
+      function botRotate() {
+        const turned = rotate(botCurrent.shape, 1);
+        for (const offset of [0, -1, 1, -2, 2]) {
+          if (!botCollides(botCurrent, offset, 0, turned)) {
+            botCurrent.x += offset;
+            botCurrent.shape = turned;
+            botCurrent.lastRotate = true;
+            botStatus.textContent = 'Rotating';
+            return true;
+          }
+        }
+        return false;
+      }
+      function botHardDrop() {
+        let distance = 0;
+        while (!botCollides(botCurrent, 0, 1, botCurrent.shape)) {
+          botCurrent.y++;
+          distance++;
+        }
+        botScore += distance * 2;
+        botStatus.textContent = 'Hard drop';
+        lockBotPiece();
+      }
+      function botHumanAction() {
+        if (!shapesMatch(botCurrent.shape, botTargetShape)) {
+          botRotate();
+        } else if (botCurrent.x < botTargetX && !botCollides(botCurrent, 1, 0, botCurrent.shape)) {
+          botCurrent.x++;
+          botStatus.textContent = 'Moving right';
+        } else if (botCurrent.x > botTargetX && !botCollides(botCurrent, -1, 0, botCurrent.shape)) {
+          botCurrent.x--;
+          botStatus.textContent = 'Moving left';
+        } else {
+          botHardDrop();
+        }
+        drawBot();
+      }
+      function startFallingBricks(field, piece, isPlayerBoard) {
+        const bricks = [];
+        field.forEach((row, y) => row.forEach((type, x) => {
+          if (type) bricks.push({ x, y, type, delay: Math.random() * 260, speed: Math.random() * 90 });
+        }));
+        if (piece) {
+          piece.shape.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+            const y = piece.y + rowIndex;
+            if (cell && y >= 0) bricks.push({ x: piece.x + colIndex, y, type: piece.type, delay: Math.random() * 260, speed: Math.random() * 90 });
+          }));
+        }
+        const animation = bricks.length ? { bricks, elapsed: 0 } : null;
+        if (isPlayerBoard) playerFallAnimation = animation;
+        else botFallAnimation = animation;
+      }
+      function drawFallingBricks(context, animation) {
+        for (const brick of animation.bricks) {
+          const age = Math.max(0, animation.elapsed - brick.delay) / 1000;
+          const top = brick.y * SIZE + brick.speed * age + 800 * age * age;
+          if (top >= ROWS * SIZE) continue;
+          context.globalAlpha = Math.min(1, (ROWS * SIZE - top) / SIZE);
+          context.fillStyle = COLORS[brick.type];
+          context.fillRect(brick.x * SIZE + 1, top + 1, SIZE - 2, SIZE - 2);
+          context.fillStyle = 'rgba(255,255,255,.24)';
+          context.fillRect(brick.x * SIZE + 2, top + 2, SIZE - 4, 2);
+          context.fillStyle = 'rgba(0,0,0,.16)';
+          context.fillRect(brick.x * SIZE + 2, top + SIZE - 4, SIZE - 4, 2);
+        }
+        context.globalAlpha = 1;
+      }
+      function updateKnockoutFalls(delta) {
+        let active = false;
+        if (playerFallAnimation) {
+          playerFallAnimation.elapsed += delta;
+          if (playerFallAnimation.elapsed >= 1500) playerFallAnimation = null;
+          else active = true;
+        }
+        if (botFallAnimation) {
+          botFallAnimation.elapsed += delta;
+          if (botFallAnimation.elapsed >= 1500) botFallAnimation = null;
+          else active = true;
+        }
+        if (active) {
+          draw();
+          drawBot();
+        }
+      }
+      function endGame(result = 'BOT WINS') {
+        if (!running) return;
+        running = false;
+        triggerKoImpact();
+        paused = false;
+        clearHeldControls();
+        matchPlayerScore += score;
+        matchBotScore += botScore;
+        matchPlayerLines += lines;
+        matchBotLines += botLines;
+        roundNumber++;
+        const playerWonRound = result === 'YOU WIN';
+        startFallingBricks(playerWonRound ? botBoard : board, playerWonRound ? botCurrent : current, !playerWonRound);
+        if (playerWonRound) playerWins++;
+        else botWins++;
+        matchComplete = playerWins >= 3 || botWins >= 3;
+        roundWinsNode.textContent = `${playerWins} - ${botWins}`;
+        roundNumberNode.textContent = String(Math.min(roundNumber, 5));
+        document.querySelector('#overlay-eyebrow').textContent = matchComplete ? 'Knockout complete' : `Round ${roundNumber} complete`;
+        document.querySelector('#overlay-title').textContent = matchComplete ? (playerWonRound ? 'MATCH WON' : 'MATCH LOST') : result;
+        document.querySelector('#overlay-copy').textContent = matchComplete
+          ? `Final set ${playerWins} - ${botWins}. ${playerWonRound ? 'You take the knockout.' : 'The bot takes the knockout.'}`
+          : `${playerWonRound ? 'Round to you.' : 'Bot takes the round.'} Set ${playerWins} - ${botWins}. First to 3 wins.`;
+        startButton.textContent = matchComplete ? 'New match' : 'Next round';
+        matchStatus.textContent = matchComplete ? (playerWonRound ? 'Match winner' : 'Match lost') : result;
+        botStatus.textContent = matchComplete ? (playerWonRound ? 'Defeated' : 'Match winner') : (playerWonRound ? 'Round lost' : 'Round winner');
+        overlay.hidden = false;
+        pauseButton.textContent = 'Pause';
+      }
+      function triggerKoImpact() {
+        const body = document.body;
+        shell.classList.remove('ko-shake');
+        body.classList.remove('ko-impact');
+        void shell.offsetWidth;
+        shell.classList.add('ko-shake');
+        body.classList.add('ko-impact');
+        window.setTimeout(() => {
+          shell.classList.remove('ko-shake');
+          body.classList.remove('ko-impact');
+        }, 650);
+      }
+      function boardHeight(field) {
+        let total = 0;
+        for (let col = 0; col < COLS; col++) {
+          for (let row = 0; row < ROWS; row++) {
+            if (field[row][col]) { total += ROWS - row; break; }
+          }
+        }
+        return total;
+      }
+      function finishTimedMatch() {
+        if (!running) return;
+        const totalPlayerScore = matchPlayerScore + score;
+        const totalBotScore = matchBotScore + botScore;
+        const totalPlayerLines = matchPlayerLines + lines;
+        const totalBotLines = matchBotLines + botLines;
+        let result = 'DRAW';
+        if (playerWins !== botWins) result = playerWins > botWins ? 'YOU WIN' : 'BOT WINS';
+        else if (totalPlayerScore !== totalBotScore) result = totalPlayerScore > totalBotScore ? 'YOU WIN' : 'BOT WINS';
+        else if (totalPlayerLines !== totalBotLines) result = totalPlayerLines > totalBotLines ? 'YOU WIN' : 'BOT WINS';
+        else if (boardHeight(board) !== boardHeight(botBoard)) result = boardHeight(board) < boardHeight(botBoard) ? 'YOU WIN' : 'BOT WINS';
+        running = false;
+        paused = false;
+        matchComplete = true;
+        clearHeldControls();
+        document.querySelector('#overlay-eyebrow').textContent = 'Two-minute battle complete';
+        document.querySelector('#overlay-title').textContent = result === 'DRAW' ? 'DRAW' : (result === 'YOU WIN' ? 'MATCH WON' : 'MATCH LOST');
+        document.querySelector('#overlay-copy').textContent = `Set ${playerWins} - ${botWins} · Score ${totalPlayerScore.toLocaleString()} - ${totalBotScore.toLocaleString()}. ${result === 'DRAW' ? 'Dead heat.' : result === 'YOU WIN' ? 'You take the battle.' : 'The bot takes the battle.'}`;
+        startButton.textContent = 'New match';
+        matchStatus.textContent = result === 'YOU WIN' ? 'Match winner' : result === 'DRAW' ? 'Draw' : 'Match lost';
+        botStatus.textContent = result === 'YOU WIN' ? 'Defeated' : result === 'DRAW' ? 'Draw' : 'Match winner';
+        overlay.hidden = false;
+      }
+      function togglePause() {
+        if (!running) return;
+        paused = !paused;
+        pauseButton.textContent = paused ? 'Resume' : 'Pause';
+        if (paused) {
+          clearHeldControls();
+          document.querySelector('#overlay-eyebrow').textContent = 'Take your time';
+          document.querySelector('#overlay-title').innerHTML = 'Paused.';
+          document.querySelector('#overlay-copy').textContent = 'Your stack is waiting exactly where you left it.';
+          startButton.textContent = 'Resume';
+          overlay.hidden = false;
+        } else {
+          overlay.hidden = true;
+          lastTime = 0;
+        }
+      }
+      function paintCell(context, x, y, color, size) {
+        context.fillStyle = color;
+        context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+        context.fillStyle = 'rgba(255,255,255,.24)';
+        context.fillRect(x * size + 2, y * size + 2, size - 4, 2);
+        context.fillStyle = 'rgba(0,0,0,.16)';
+        context.fillRect(x * size + 2, y * size + size - 4, size - 4, 2);
+      }
+      function drawPiece(context, piece, ghost = false) {
+        const color = ghost ? 'rgba(220,239,226,.16)' : COLORS[piece.type];
+        piece.shape.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+          if (cell && piece.y + rowIndex >= 0) paintCell(context, piece.x + colIndex, piece.y + rowIndex, color, SIZE);
+        }));
+      }
+      function draw() {
+        ctx.clearRect(0, 0, boardCanvas.width, boardCanvas.height);
+        ctx.fillStyle = '#11191b';
+        ctx.fillRect(0, 0, boardCanvas.width, boardCanvas.height);
+        ctx.strokeStyle = 'rgba(164,190,180,.065)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= COLS; x++) { ctx.beginPath(); ctx.moveTo(x * SIZE + .5, 0); ctx.lineTo(x * SIZE + .5, ROWS * SIZE); ctx.stroke(); }
+        for (let y = 0; y <= ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * SIZE + .5); ctx.lineTo(COLS * SIZE, y * SIZE + .5); ctx.stroke(); }
+        if (playerFallAnimation) drawFallingBricks(ctx, playerFallAnimation);
+        else board.forEach((row, y) => row.forEach((type, x) => { if (type) paintCell(ctx, x, y, COLORS[type], SIZE); }));
+        if (current && !playerFallAnimation) {
+          const ghost = { ...current, y: current.y };
+          while (!collides(ghost, 0, 1, ghost.shape)) ghost.y++;
+          drawPiece(ctx, ghost, true);
+          drawPiece(ctx, current);
+        }
+        lineClearEffects.filter((effect) => effect.owner === 'player').forEach((effect) => drawLineClearEffect(ctx, effect));
+      }
+      function drawBot() {
+        botCtx.clearRect(0, 0, botCanvas.width, botCanvas.height);
+        botCtx.fillStyle = '#11191b';
+        botCtx.fillRect(0, 0, botCanvas.width, botCanvas.height);
+        botCtx.strokeStyle = 'rgba(164,190,180,.065)';
+        botCtx.lineWidth = 1;
+        for (let x = 0; x <= COLS; x++) { botCtx.beginPath(); botCtx.moveTo(x * SIZE + .5, 0); botCtx.lineTo(x * SIZE + .5, ROWS * SIZE); botCtx.stroke(); }
+        for (let y = 0; y <= ROWS; y++) { botCtx.beginPath(); botCtx.moveTo(0, y * SIZE + .5); botCtx.lineTo(COLS * SIZE, y * SIZE + .5); botCtx.stroke(); }
+        if (botFallAnimation) drawFallingBricks(botCtx, botFallAnimation);
+        else if (botBoard) botBoard.forEach((row, y) => row.forEach((type, x) => { if (type) paintCell(botCtx, x, y, COLORS[type], SIZE); }));
+        if (botCurrent && !botFallAnimation) drawPiece(botCtx, botCurrent);
+        lineClearEffects.filter((effect) => effect.owner === 'bot').forEach((effect) => drawLineClearEffect(botCtx, effect));
+      }
+      function drawLineClearEffect(context, effect) {
+        const progress = Math.min(1, effect.elapsed / 420);
+        const easedProgress = progress * progress * (3 - 2 * progress);
+        const fade = Math.sin(progress * Math.PI);
+        const sweepWidth = 54;
+        const sweepX = easedProgress * (COLS * SIZE + sweepWidth) - sweepWidth / 2;
+        context.save();
+        effect.rows.forEach((row) => {
+          context.fillStyle = `rgba(255,255,255,${fade * 0.24})`;
+          context.fillRect(0, row * SIZE + 1, COLS * SIZE, SIZE - 2);
+          const beam = context.createLinearGradient(sweepX - sweepWidth / 2, 0, sweepX + sweepWidth / 2, 0);
+          beam.addColorStop(0, 'rgba(185,244,91,0)');
+          beam.addColorStop(0.35, `rgba(185,244,91,${fade * 0.4})`);
+          beam.addColorStop(0.5, `rgba(255,255,255,${fade * 0.95})`);
+          beam.addColorStop(0.65, `rgba(185,244,91,${fade * 0.4})`);
+          beam.addColorStop(1, 'rgba(185,244,91,0)');
+          context.fillStyle = beam;
+          context.fillRect(sweepX - sweepWidth / 2, row * SIZE + 1, sweepWidth, SIZE - 2);
+        });
+        context.restore();
+      }
+      function drawMini(canvas, type) {
+        const context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        if (!type) return;
+        const shape = SHAPES[type];
+        const size = Math.min((canvas.width - 8) / shape[0].length, (canvas.height - 8) / shape.length);
+        const offsetX = (canvas.width - size * shape[0].length) / 2;
+        const offsetY = (canvas.height - size * shape.length) / 2;
+        shape.forEach((row, y) => row.forEach((cell, x) => {
+          if (!cell) return;
+          context.fillStyle = COLORS[type];
+          context.fillRect(offsetX + x * size + 1, offsetY + y * size + 1, size - 2, size - 2);
+          context.fillStyle = 'rgba(255,255,255,.25)';
+          context.fillRect(offsetX + x * size + 2, offsetY + y * size + 2, size - 4, 2);
+        }));
+      }
+      function drawPreviews() {
+        drawMini(holdCanvas, held);
+        holdEmpty.style.display = held ? 'none' : 'block';
+        nextCanvases.forEach((canvas, index) => drawMini(canvas, queue[index]));
+      }
+      function frame(time) {
+        requestAnimationFrame(frame);
+        const delta = lastTime ? time - lastTime : 0;
+        lastTime = time;
+        updateKnockoutFalls(delta);
+        if (!running || paused) return;
+        lineClearEffects.forEach((effect) => { effect.elapsed += delta; });
+        lineClearEffects = lineClearEffects.filter((effect) => effect.elapsed < 420);
+        matchElapsed += delta;
+        renderClock();
+        if (matchElapsed >= MATCH_LENGTH) { finishTimedMatch(); return; }
+        if (heldHorizontal) {
+          horizontalElapsed += delta;
+          const repeatDelay = horizontalRepeating ? 45 : 155;
+          if (horizontalElapsed >= repeatDelay) {
+            horizontalElapsed -= repeatDelay;
+            horizontalRepeating = true;
+            move(heldHorizontal, 0);
+          }
+        }
+        if (heldKeys.has('ArrowDown')) {
+          dropElapsed = 0;
+          softDropElapsed += delta;
+          if (softDropElapsed >= 42) {
+            softDropElapsed -= 42;
+            move(0, 1);
+          }
+        } else {
+          softDropElapsed = 0;
+          dropElapsed += delta;
+          const interval = Math.max(90, 850 * Math.pow(.82, level - 1));
+          if (dropElapsed >= interval) {
+            dropElapsed = 0;
+            move(0, 1);
+          }
+        }
+        if (running && botCurrent) {
+          botElapsed += delta;
+          botActionElapsed += delta;
+          if (botElapsed > 120) botStatus.textContent = 'Placing';
+          const actionInterval = Math.max(38, AI_DIFFICULTIES[difficultySelect.value].dropInterval * 2);
+          if (botActionElapsed >= actionInterval) {
+            botActionElapsed = 0;
+            botHumanAction();
+          }
+        }
+      }
+      document.addEventListener('keydown', (event) => {
+        const key = event.key;
+        if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'Shift', 'Escape'].includes(key)) event.preventDefault();
+        if (key === 'Escape') { togglePause(); return; }
+        if (!running || paused) return;
+        if (key === 'ArrowLeft' || key === 'ArrowRight') {
+          if (!heldKeys.has(key)) {
+            heldKeys.add(key);
+            heldHorizontal = key === 'ArrowLeft' ? -1 : 1;
+            horizontalElapsed = 0;
+            horizontalRepeating = false;
+            move(heldHorizontal, 0);
+          }
+        } else if (key === 'ArrowDown') {
+          if (!heldKeys.has(key)) {
+            heldKeys.add(key);
+            softDropElapsed = 0;
+            move(0, 1);
+          }
+        } else if (!event.repeat && key === 'ArrowUp') tryRotate(1);
+        else if (!event.repeat && key === ' ') hardDrop();
+        else if (!event.repeat && key === 'Shift') holdPiece();
+      });
+      document.addEventListener('keyup', (event) => {
+        if (!heldKeys.has(event.key)) return;
+        heldKeys.delete(event.key);
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          heldHorizontal = remainingHorizontal();
+          horizontalElapsed = 0;
+          horizontalRepeating = false;
+        }
+        if (event.key === 'ArrowDown') softDropElapsed = 0;
+      });
+      window.addEventListener('blur', clearHeldControls);
+      startButton.addEventListener('click', () => {
+        if (running && paused) { togglePause(); return; }
+        document.querySelector('#overlay-eyebrow').textContent = 'Ready when you are';
+        document.querySelector('#overlay-title').innerHTML = 'Stack<br>smart.';
+        document.querySelector('#overlay-copy').textContent = 'Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.';
+        startButton.textContent = 'Start knockout';
+        resetGame(roundNumber === 0 || matchComplete);
+      });
+      pauseButton.addEventListener('click', togglePause);
+      document.querySelector('#restart-button').addEventListener('click', () => {
+        document.querySelector('#overlay-eyebrow').textContent = 'Ready when you are';
+        document.querySelector('#overlay-title').innerHTML = 'Stack<br>smart.';
+        document.querySelector('#overlay-copy').textContent = 'Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.';
+        startButton.textContent = 'Start knockout';
+        resetGame(true);
+      });
+      bestNode.textContent = String(best);
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      bag = [];
+      queue = [];
+      current = null;
+      held = null;
+      botBoard = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      botBag = [];
+      botQueue = [];
+      botCurrent = null;
+      botScore = 0;
+      botLines = 0;
+      drawPreviews();
+      draw();
+      drawBot();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
