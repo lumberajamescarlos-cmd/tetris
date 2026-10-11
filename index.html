@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101719">
-  <title>STACK / Tetris</title>
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>STACK Mobile / Tetris</title>
   <style>
     :root {
       color-scheme: dark;
@@ -147,6 +148,7 @@
     .next-list canvas:first-child { grid-column: 1 / -1; width: 72px; height: 44px; }
     .hold-empty { color: #687b77; font-size: 11px; font-weight: 700; text-align: center; }
     .controls { display: grid; gap: 8px; }
+    .touch-controls { display: none; }
     .control-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #b1bfba; font-size: 12px; }
     kbd { min-width: 27px; padding: 4px 6px; display: inline-block; text-align: center; color: var(--paper); background: #29383a; border: 1px solid #405153; border-bottom-width: 2px; font: 800 10px Bahnschrift, "Segoe UI", sans-serif; }
     .key-group { display: flex; gap: 4px; }
@@ -170,6 +172,49 @@
       .control-row { font-size: 10px; }
       .edition { font-size: 9px; }
     }
+    @media (max-width: 700px) {
+      body { padding-bottom: env(safe-area-inset-bottom); }
+      header { min-height: 54px; padding-inline: 14px; }
+      main { padding: 8px 8px 18px; }
+      .game-layout { width: 100%; gap: 12px; }
+      .round-banner { margin-bottom: 5px; font-size: 9px; }
+      .boards { gap: 6px; }
+      .board-heading { min-height: 24px; margin-bottom: 3px; }
+      .board-name { font-size: 10px; }
+      .battle-stat { font-size: 8px; }
+      .battle-stat strong { font-size: 10px; }
+      .attack-meter { min-height: 15px; margin: 3px 0 4px; font-size: 8px; }
+      .board-wrap { box-shadow: 0 7px 22px #0008, 3px 3px 0 #273638; }
+      .side { gap: 7px; }
+      .side > .mini-panel:not(.controls) { display: none; }
+      .side > .controls { display: none; }
+      .actions { grid-template-columns: 1fr 48px 48px; gap: 6px; }
+      .action-button { min-height: 42px; }
+      .touch-controls {
+        display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 8px; margin-top: 10px; padding: 8px;
+        border: 1px solid var(--line); background: rgba(23, 34, 36, .96);
+        border-radius: 6px; touch-action: none; user-select: none; -webkit-user-select: none;
+      }
+      .touch-moves { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-self: center; }
+      .touch-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .touch-button {
+        min-width: 0; min-height: 58px; border: 1px solid #435456; border-radius: 5px;
+        color: var(--paper); background: #202e30; font-size: 16px; font-weight: 900;
+        touch-action: none; user-select: none; -webkit-user-select: none;
+      }
+      .touch-button:active { color: #182018; background: var(--mint); transform: translateY(1px); }
+      .touch-button.action { font-size: 10px; letter-spacing: .04em; }
+      .stats { gap: 6px; }
+      .stat { padding: 8px; }
+      footer { padding: 10px 12px; font-size: 8px; }
+    }
+    @media (max-width: 370px) {
+      .touch-controls { gap: 5px; padding: 5px; }
+      .touch-button { min-height: 52px; }
+      .touch-button.action { font-size: 9px; }
+      .actions { grid-template-columns: 1fr 42px 42px; }
+    }
     @media (max-width: 370px) {
       .game-layout { grid-template-columns: 1fr; gap: 10px; }
       .boards { gap: 7px; }
@@ -183,7 +228,7 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div class="brand-name">STACK<span>/</span></div></div>
-      <div class="edition">A falling-block classic</div>
+      <div class="edition">Mobile edition · touch controls</div>
     </header>
     <main>
       <div class="game-layout">
@@ -221,6 +266,19 @@
                 <div class="ko-callout" id="bot-ko-callout" aria-hidden="true">K.O.</div>
               </section>
               <div class="bot-status" id="bot-status">Waiting</div>
+            </div>
+          </div>
+          <div class="touch-controls" aria-label="Touch controls">
+            <div class="touch-moves">
+              <button class="touch-button" type="button" data-touch-key="ArrowLeft" data-repeat="true" aria-label="Move left">←</button>
+              <button class="touch-button" type="button" data-touch-key="ArrowDown" data-repeat="true" aria-label="Soft drop">↓</button>
+              <button class="touch-button" type="button" data-touch-key="ArrowRight" data-repeat="true" aria-label="Move right">→</button>
+            </div>
+            <div class="touch-actions">
+              <button class="touch-button action" type="button" data-touch-key="ArrowUp" aria-label="Rotate piece">ROTATE</button>
+              <button class="touch-button action" type="button" data-touch-key=" " aria-label="Hard drop">DROP</button>
+              <button class="touch-button action" type="button" data-touch-key="Shift" aria-label="Hold or swap piece">HOLD</button>
+              <button class="touch-button action" type="button" data-touch-key="Escape" aria-label="Pause or resume game">PAUSE</button>
             </div>
           </div>
         </div>
@@ -1301,6 +1359,32 @@
           horizontalRepeating = false;
         }
         if (event.key === 'ArrowDown') softDropElapsed = 0;
+      });
+      const touchControls = document.querySelector('.touch-controls');
+      function sendTouchKey(type, key) {
+        document.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
+      }
+      touchControls.addEventListener('pointerdown', (event) => {
+        const button = event.target.closest('[data-touch-key]');
+        if (!button) return;
+        event.preventDefault();
+        const key = button.dataset.touchKey;
+        if (button.dataset.repeat === 'true') button.setPointerCapture(event.pointerId);
+        sendTouchKey('keydown', key);
+        if (button.dataset.repeat !== 'true') sendTouchKey('keyup', key);
+      });
+      for (const eventType of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+        touchControls.addEventListener(eventType, (event) => {
+          const button = event.target.closest('[data-touch-key]');
+          if (button?.dataset.repeat === 'true') sendTouchKey('keyup', button.dataset.touchKey);
+        });
+      }
+      touchControls.addEventListener('click', (event) => {
+        if (event.detail !== 0) return;
+        const button = event.target.closest('[data-touch-key]');
+        if (!button) return;
+        sendTouchKey('keydown', button.dataset.touchKey);
+        sendTouchKey('keyup', button.dataset.touchKey);
       });
       window.addEventListener('blur', clearHeldControls);
       startButton.addEventListener('click', () => {
