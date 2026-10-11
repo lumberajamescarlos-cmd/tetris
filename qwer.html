@@ -48,8 +48,25 @@
       12% { opacity: 1; }
       100% { opacity: 0; }
     }
+    .ko-callout {
+      position: absolute; z-index: 4; inset: 0; display: grid; place-items: center;
+      color: #fff; font-size: 88px; font-weight: 1000; line-height: 1;
+      text-shadow: 0 3px 0 #a92936, 0 8px 24px #000c;
+      opacity: 0; pointer-events: none; visibility: hidden;
+    }
+    .ko-callout.show { visibility: visible; animation: board-ko .9s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes board-ko {
+      0% { opacity: 0; transform: scale(.35) rotate(-9deg); }
+      22% { opacity: 1; transform: scale(1.12) rotate(3deg); }
+      38%, 68% { opacity: 1; transform: scale(1) rotate(0); }
+      100% { opacity: 0; transform: scale(1.3) rotate(4deg); }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .shell.ko-shake, body.ko-impact::after { animation: none; }
+      .shell.ko-shake, body.ko-impact::after, .ko-callout.show { animation: none; }
+      .ko-callout.show { opacity: 1; visibility: visible; }
+    }
+    @media (max-width: 560px) {
+      .ko-callout { font-size: 68px; }
     }
     header {
       min-height: 76px; padding: 0 clamp(18px, 5vw, 72px);
@@ -93,6 +110,9 @@
     @media (prefers-reduced-motion: reduce) {
       .board-wrap.hard-drop-shake { animation: none; }
     }
+    .solo-mode .boards { grid-template-columns: minmax(0, 300px); }
+    .solo-mode .board-column:nth-child(2), .solo-mode .stats .stat:nth-child(2),
+    .solo-mode .attack-meter, .solo-mode .difficulty-panel { display: none; }
     #board { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
     #bot-board { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
     .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; background: rgba(11, 17, 18, .78); backdrop-filter: blur(3px); }
@@ -103,6 +123,11 @@
     .overlay p { margin: 15px 0 20px; color: #b6c4bf; line-height: 1.5; font-size: 14px; }
     .primary { border: 0; padding: 12px 20px; color: #182018; background: var(--mint); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; box-shadow: 3px 3px 0 #76983e; }
     .primary:hover { background: #d0ff88; transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #76983e; }
+    .mode-options { display: grid; gap: 9px; margin-top: 20px; }
+    .mode-options[hidden] { display: none; }
+    .mode-options .primary { width: 100%; }
+    .primary.secondary { color: var(--paper); background: #263638; box-shadow: 3px 3px 0 #11191b; }
+    .primary.secondary:hover { color: var(--mint); background: #304143; }
     .side { display: grid; gap: 12px; }
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stat, .mini-panel { border: 1px solid var(--line); background: rgba(23, 34, 36, .96); }
@@ -125,7 +150,7 @@
     .control-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #b1bfba; font-size: 12px; }
     kbd { min-width: 27px; padding: 4px 6px; display: inline-block; text-align: center; color: var(--paper); background: #29383a; border: 1px solid #405153; border-bottom-width: 2px; font: 800 10px Bahnschrift, "Segoe UI", sans-serif; }
     .key-group { display: flex; gap: 4px; }
-    .actions { display: grid; grid-template-columns: 1fr 40px; gap: 8px; }
+    .actions { display: grid; grid-template-columns: 1fr 40px 40px; gap: 8px; }
     .action-button { min-height: 38px; border: 1px solid #435456; color: var(--paper); background: #202e30; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
     .action-button:hover { border-color: var(--mint); color: var(--mint); }
     .action-button:focus-visible, .primary:focus-visible { outline: 2px solid white; outline-offset: 3px; }
@@ -163,7 +188,7 @@
     <main>
       <div class="game-layout">
         <div class="arena">
-          <div class="round-banner"><span>Knock Out · First to 3</span><span>Time <strong id="match-clock">2:00</strong></span><span>Round <strong id="round-number">1</strong> · Set <strong id="round-wins">0 - 0</strong></span></div>
+          <div class="round-banner"><span id="round-label">Knock Out · First to 3</span><span id="clock-label">Time <strong id="match-clock">2:00</strong></span><span id="round-info">KO <strong id="round-wins">0 - 0</strong></span></div>
           <div class="boards">
             <div class="board-column">
               <div class="board-heading"><span class="board-name">You</span><span class="battle-stat">Lines <strong id="lines">0</strong> · Combo <strong id="combo">0</strong></span></div>
@@ -171,12 +196,17 @@
               <section class="board-wrap" aria-label="Your Tetris game board">
                 <canvas id="board" width="300" height="600" aria-label="Your game board, 10 columns by 20 rows"></canvas>
                 <div class="redline" id="redline" aria-hidden="true"><span>REDLINE</span></div>
+                <div class="ko-callout" id="player-ko-callout" aria-hidden="true">K.O</div>
                 <div class="overlay" id="overlay">
                   <div class="overlay-content">
-                    <p class="eyebrow" id="overlay-eyebrow">Ready when you are</p>
+                    <p class="eyebrow" id="overlay-eyebrow">Main menu</p>
                     <h1 id="overlay-title">Stack<br>smart.</h1>
-                    <p id="overlay-copy">Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.</p>
-                    <button class="primary" id="start-button" type="button">Start knockout</button>
+                    <p id="overlay-copy">Choose your game mode.</p>
+                    <div class="mode-options" id="mode-options">
+                      <button class="primary" id="versus-button" type="button">VS mode</button>
+                      <button class="primary secondary" id="solo-button" type="button">Solo mode</button>
+                    </div>
+                    <button class="primary" id="start-button" type="button" hidden>Start knockout</button>
                   </div>
                 </div>
               </section>
@@ -188,6 +218,7 @@
               <section class="board-wrap" aria-label="Bot Tetris game board">
                 <canvas id="bot-board" width="300" height="600" aria-label="Bot game board, 10 columns by 20 rows"></canvas>
                 <div class="redline" id="bot-redline" aria-hidden="true"><span>REDLINE</span></div>
+                <div class="ko-callout" id="bot-ko-callout" aria-hidden="true">K.O.</div>
               </section>
               <div class="bot-status" id="bot-status">Waiting</div>
             </div>
@@ -225,11 +256,11 @@
             <div class="control-row"><span>Hold / swap</span><kbd>SHIFT</kbd></div>
             <div class="control-row"><span>Pause</span><kbd>ESC</kbd></div>
           </section>
-          <div class="actions"><button class="action-button" id="pause-button" type="button" aria-label="Pause game">Pause</button><button class="action-button" id="restart-button" type="button" aria-label="Restart game" title="Restart">↻</button></div>
+          <div class="actions"><button class="action-button" id="pause-button" type="button" aria-label="Pause game">Pause</button><button class="action-button" id="restart-button" type="button" aria-label="Restart game" title="Restart">↻</button><button class="action-button" id="menu-button" type="button" aria-label="Main menu" title="Main menu">⌂</button></div>
         </aside>
       </div>
     </main>
-    <footer>Two-minute battle · T-Spins, combos & big clears boost attacks</footer>
+    <footer>T-Spins, combos & big clears boost your score</footer>
   </div>
   <script>
     (() => {
@@ -237,6 +268,7 @@
       const COLS = 10;
       const ROWS = 20;
       const SIZE = 30;
+      const GARBAGE_TYPE = 'G';
       const COLORS = { I: '#45d9cf', O: '#ffd34f', T: '#bb8cff', S: '#b9f45b', Z: '#ff6e67', J: '#5b9dff', L: '#ff995b', G: '#83918c' };
       const SHAPES = {
         I: [[1, 1, 1, 1]], O: [[1, 1], [1, 1]], T: [[0, 1, 0], [1, 1, 1]],
@@ -252,6 +284,13 @@
       const shell = document.querySelector('.shell');
       const startButton = document.querySelector('#start-button');
       const pauseButton = document.querySelector('#pause-button');
+      const modeOptions = document.querySelector('#mode-options');
+      const versusButton = document.querySelector('#versus-button');
+      const soloButton = document.querySelector('#solo-button');
+      const menuButton = document.querySelector('#menu-button');
+      const roundLabel = document.querySelector('#round-label');
+      const clockLabel = document.querySelector('#clock-label');
+      const roundInfo = document.querySelector('#round-info');
         const difficultySelect = document.querySelector('#ai-difficulty');
       const scoreNode = document.querySelector('#score');
       const botScoreNode = document.querySelector('#bot-score');
@@ -291,10 +330,12 @@
       let botWins = 0;
       let roundNumber = 0;
       let matchComplete = false;
+      let gameMode = 'versus';
+      const KO_LIMIT = 3;
       let combo = 0;
       let botCombo = 0;
-      let pendingGarbage = 0;
-      let botPendingGarbage = 0;
+      let playerGarbage = 0;
+      let enemyGarbage = 0;
       let lastAttack = 0;
       let botLastAttack = 0;
       let backToBack = false;
@@ -370,6 +411,28 @@
       function renderClock() {
         const secondsLeft = Math.ceil(Math.max(0, MATCH_LENGTH - matchElapsed) / 1000);
         matchClockNode.textContent = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
+      }
+      function beginMode(mode) {
+        gameMode = mode;
+        shell.classList.toggle('solo-mode', gameMode === 'solo');
+        roundLabel.textContent = gameMode === 'solo' ? 'Solo · Endless' : 'Knock Out · First to 3';
+        matchClockNode.textContent = gameMode === 'solo' ? '∞' : '2:00';
+        roundInfo.hidden = gameMode === 'solo';
+        modeOptions.hidden = true;
+        startButton.hidden = true;
+        resetGame(true);
+      }
+      function showMainMenu() {
+        running = false;
+        paused = false;
+        clearHeldControls();
+        overlay.hidden = false;
+        modeOptions.hidden = false;
+        startButton.hidden = true;
+        document.querySelector('#overlay-eyebrow').textContent = 'Main menu';
+        document.querySelector('#overlay-title').innerHTML = 'Stack<br>smart.';
+        document.querySelector('#overlay-copy').textContent = 'Choose your game mode.';
+        pauseButton.textContent = 'Pause';
       }
       function botCollides(piece, dx, dy, shape, field = botBoard) {
         for (let row = 0; row < shape.length; row++) {
@@ -465,6 +528,9 @@
         botActionElapsed = 0;
         botStatus.textContent = 'Calculating';
       }
+      function isKnockoutReached() {
+        return playerWins >= KO_LIMIT || botWins >= KO_LIMIT;
+      }
       function resetGame(resetMatch = false) {
         playerFallAnimation = null;
         botFallAnimation = null;
@@ -491,8 +557,8 @@
         level = 1;
         combo = 0;
         botCombo = 0;
-        pendingGarbage = 0;
-        botPendingGarbage = 0;
+        playerGarbage = 0;
+        enemyGarbage = 0;
         lastAttack = 0;
         botLastAttack = 0;
         backToBack = false;
@@ -517,13 +583,13 @@
         running = true;
         paused = false;
         spawnPiece();
-        spawnBotPiece();
+        if (gameMode === 'versus') spawnBotPiece();
         updateBotStats();
         updateStats();
-        renderClock();
-        matchStatus.textContent = 'Battle in progress';
-        botStatus.textContent = 'Calculating';
-        roundNumberNode.textContent = String(Math.min(roundNumber + 1, 5));
+        if (gameMode === 'versus') renderClock();
+        matchStatus.textContent = gameMode === 'solo' ? 'Solo run' : 'Battle in progress';
+        botStatus.textContent = gameMode === 'solo' ? 'Waiting' : 'Calculating';
+        if (roundNumberNode) roundNumberNode.textContent = '—';
         roundWinsNode.textContent = `${playerWins} - ${botWins}`;
         overlay.hidden = true;
         pauseButton.textContent = 'Pause';
@@ -536,16 +602,34 @@
         drawPreviews();
         if (collides(current, 0, 0, current.shape)) endGame();
       }
-      function collides(piece, dx, dy, shape) {
+      function collidesPiece(piece, dx, dy, shape, field) {
         for (let row = 0; row < shape.length; row++) {
           for (let col = 0; col < shape[row].length; col++) {
             if (!shape[row][col]) continue;
             const x = piece.x + col + dx;
             const y = piece.y + row + dy;
-            if (x < 0 || x >= COLS || y >= ROWS || (y >= 0 && board[y][x])) return true;
+            if (x < 0 || x >= COLS || y >= ROWS || (y >= 0 && field[y][x])) return true;
           }
         }
         return false;
+      }
+      function collides(piece, dx, dy, shape) {
+        return collidesPiece(piece, dx, dy, shape, board);
+      }
+      function dropPieceToFloor(piece, field) {
+        piece.x = Math.floor((COLS - piece.shape[0].length) / 2);
+        piece.y = 0;
+        while (!collidesPiece(piece, 0, 1, piece.shape, field)) piece.y++;
+        return piece;
+      }
+      function rebuildSpawnAfterKo(queueArray, nextTypeFn, field, preserveExistingPiece) {
+        const nextPiece = makePiece(queueArray.shift());
+        queueArray.push(nextTypeFn());
+        const piece = preserveExistingPiece ? nextPiece : nextPiece;
+        piece.x = Math.floor((COLS - piece.shape[0].length) / 2);
+        piece.y = 0;
+        while (!collidesPiece(piece, 0, 1, piece.shape, field)) piece.y++;
+        return piece;
       }
       function rotate(matrix, direction) {
         const height = matrix.length;
@@ -674,12 +758,12 @@
         botLinesNode.textContent = String(botLines);
       }
       function updateBattleMeters() {
-        garbageNode.textContent = String(pendingGarbage);
-        botGarbageNode.textContent = String(botPendingGarbage);
+        garbageNode.textContent = String(playerGarbage);
+        botGarbageNode.textContent = String(enemyGarbage);
         attackNode.textContent = String(lastAttack);
         botAttackNode.textContent = String(botLastAttack);
-        updateRedline(redline, pendingGarbage);
-        updateRedline(botRedline, botPendingGarbage);
+        updateRedline(redline, playerGarbage);
+        updateRedline(botRedline, enemyGarbage);
       }
       function updateRedline(node, garbage) {
         const height = Math.min(ROWS, garbage) / ROWS * 100;
@@ -690,15 +774,73 @@
         if (wasTSpin) return [0, 2, 4, 6][cleared] || 0;
         return [0, 0, 1, 2, 4][cleared] || 0;
       }
+      function clearGarbageTiles(field) {
+        for (let row = 0; row < field.length; row++) {
+          for (let col = 0; col < field[row].length; col++) {
+            if (field[row][col] === GARBAGE_TYPE) field[row][col] = null;
+          }
+        }
+      }
+      function settleFieldDown(field) {
+        const settled = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let destination = ROWS - 1;
+        for (let row = ROWS - 1; row >= 0; row--) {
+          if (!field[row].some(Boolean)) continue;
+          settled[destination] = field[row].slice();
+          destination--;
+        }
+        return settled;
+      }
+      function clearGarbageAfterTopOut(playerWonRound) {
+        if (playerWonRound) {
+          botBoard = settleFieldDown(stripGarbageCells(botBoard));
+          enemyGarbage = 0;
+        } else {
+          board = settleFieldDown(stripGarbageCells(board));
+          playerGarbage = 0;
+        }
+        updateBattleMeters();
+        draw();
+        drawBot();
+      }
+      function buildGarbageRow() {
+        const hole = Math.floor(Math.random() * COLS);
+        return Array.from({ length: COLS }, (_, col) => (col === hole ? null : GARBAGE_TYPE));
+      }
+      function stripGarbageCells(field) {
+        return field.map((row) => row.map((cell) => (cell === GARBAGE_TYPE ? null : cell)));
+      }
+      function recoverAfterKo(playerWonRound) {
+        playerFallAnimation = null;
+        botFallAnimation = null;
+        lineClearEffects = [];
+        if (playerWonRound) {
+          botCurrent = dropPieceToFloor(botCurrent, botBoard);
+          const botPlan = scoreBotPlacement(botBoard, botCurrent.type);
+          botTargetX = botPlan ? botPlan.x : botCurrent.x;
+          botTargetShape = botPlan ? botPlan.shape : botCurrent.shape.map((row) => row.slice());
+          botElapsed = 0;
+          botDropElapsed = 0;
+          botActionElapsed = 0;
+        } else {
+          current = dropPieceToFloor(current, board);
+          dropElapsed = 0;
+        }
+        matchStatus.textContent = 'Battle in progress';
+        botStatus.textContent = playerWonRound ? 'Calculating' : 'Placing';
+        drawPreviews();
+        draw();
+        drawBot();
+      }
       function defendAgainstGarbage(cleared, fromPlayer) {
-        const pending = fromPlayer ? pendingGarbage : botPendingGarbage;
+        const pending = fromPlayer ? playerGarbage : enemyGarbage;
         const cancelled = Math.min(pending, cleared);
-        if (fromPlayer) pendingGarbage -= cancelled;
-        else botPendingGarbage -= cancelled;
+        if (fromPlayer) playerGarbage -= cancelled;
+        else enemyGarbage -= cancelled;
         updateBattleMeters();
       }
       function applyPendingGarbage(toPlayer) {
-        const amount = toPlayer ? pendingGarbage : botPendingGarbage;
+        const amount = toPlayer ? playerGarbage : enemyGarbage;
         if (!amount) return;
         const target = toPlayer ? board : botBoard;
         for (let row = 0; row < amount; row++) {
@@ -707,21 +849,24 @@
             return;
           }
           target.shift();
-          const hole = Math.floor(Math.random() * COLS);
-          target.push(Array.from({ length: COLS }, (_, col) => col === hole ? null : 'G'));
+          target.push(buildGarbageRow());
+          if (target[0].some(Boolean)) {
+            endGame(toPlayer ? 'BOT WINS' : 'YOU WIN');
+            return;
+          }
         }
-        if (toPlayer) pendingGarbage = 0;
-        else botPendingGarbage = 0;
+        if (toPlayer) playerGarbage = 0;
+        else enemyGarbage = 0;
         updateBattleMeters();
       }
       function sendAttack(attack, fromPlayer) {
-        if (!attack || !running) return;
+        if (!attack || !running || gameMode === 'solo') return;
         if (fromPlayer) {
-          botPendingGarbage += attack;
+          enemyGarbage += attack;
           lastAttack = attack;
           botStatus.textContent = `${attack} garbage queued`;
         } else {
-          pendingGarbage += attack;
+          playerGarbage += attack;
           botLastAttack = attack;
           matchStatus.textContent = `${attack} garbage queued`;
         }
@@ -798,13 +943,15 @@
       }
       function botHumanAction() {
         if (!shapesMatch(botCurrent.shape, botTargetShape)) {
-          botRotate();
+          if (!botRotate()) botHardDrop();
         } else if (botCurrent.x < botTargetX && !botCollides(botCurrent, 1, 0, botCurrent.shape)) {
           botCurrent.x++;
           botStatus.textContent = 'Moving right';
         } else if (botCurrent.x > botTargetX && !botCollides(botCurrent, -1, 0, botCurrent.shape)) {
           botCurrent.x--;
           botStatus.textContent = 'Moving left';
+        } else if (botCurrent.x !== botTargetX) {
+          botHardDrop();
         } else {
           botHardDrop();
         }
@@ -860,43 +1007,80 @@
       function endGame(result = 'BOT WINS') {
         if (!running) return;
         running = false;
-        triggerKoImpact();
         paused = false;
         clearHeldControls();
+        if (gameMode === 'solo') {
+          document.querySelector('#overlay-eyebrow').textContent = 'Solo run complete';
+          document.querySelector('#overlay-title').textContent = 'GAME OVER';
+          document.querySelector('#overlay-copy').textContent = `Score ${score.toLocaleString()} · ${lines} lines cleared.`;
+          modeOptions.hidden = true;
+          startButton.hidden = false;
+          startButton.textContent = 'Play again';
+          matchStatus.textContent = 'Game over';
+          overlay.hidden = false;
+          pauseButton.textContent = 'Pause';
+          return;
+        }
         matchPlayerScore += score;
         matchBotScore += botScore;
         matchPlayerLines += lines;
         matchBotLines += botLines;
-        roundNumber++;
         const playerWonRound = result === 'YOU WIN';
+        triggerKoImpact(playerWonRound);
+        clearGarbageAfterTopOut(playerWonRound);
         startFallingBricks(playerWonRound ? botBoard : board, playerWonRound ? botCurrent : current, !playerWonRound);
         if (playerWonRound) playerWins++;
         else botWins++;
-        matchComplete = playerWins >= 3 || botWins >= 3;
+        matchComplete = isKnockoutReached();
         roundWinsNode.textContent = `${playerWins} - ${botWins}`;
-        roundNumberNode.textContent = String(Math.min(roundNumber, 5));
-        document.querySelector('#overlay-eyebrow').textContent = matchComplete ? 'Knockout complete' : `Round ${roundNumber} complete`;
-        document.querySelector('#overlay-title').textContent = matchComplete ? (playerWonRound ? 'MATCH WON' : 'MATCH LOST') : result;
-        document.querySelector('#overlay-copy').textContent = matchComplete
-          ? `Final set ${playerWins} - ${botWins}. ${playerWonRound ? 'You take the knockout.' : 'The bot takes the knockout.'}`
-          : `${playerWonRound ? 'Round to you.' : 'Bot takes the round.'} Set ${playerWins} - ${botWins}. First to 3 wins.`;
-        startButton.textContent = matchComplete ? 'New match' : 'Next round';
-        matchStatus.textContent = matchComplete ? (playerWonRound ? 'Match winner' : 'Match lost') : result;
-        botStatus.textContent = matchComplete ? (playerWonRound ? 'Defeated' : 'Match winner') : (playerWonRound ? 'Round lost' : 'Round winner');
+        if (roundNumberNode) roundNumberNode.textContent = '—';
+
+        if (!matchComplete) {
+          lastAttack = 0;
+          botLastAttack = 0;
+
+          if (playerWonRound) botStatus.textContent = 'KO lost';
+          else matchStatus.textContent = 'KO survived';
+          recoverAfterKo(playerWonRound);
+          updateBattleMeters();
+          running = true;
+          paused = false;
+          clearHeldControls();
+          startButton.hidden = true;
+          modeOptions.hidden = true;
+          overlay.hidden = true;
+          pauseButton.textContent = 'Pause';
+          lastTime = 0;
+          return;
+        }
+
+        document.querySelector('#overlay-eyebrow').textContent = 'KO / Match Update';
+        document.querySelector('#overlay-title').textContent = playerWonRound ? 'MATCH WON' : 'MATCH LOST';
+        document.querySelector('#overlay-copy').textContent = `Final KO ${playerWins} - ${botWins}. ${playerWonRound ? 'You take the match.' : 'The bot takes the match.'}`;
+        startButton.textContent = 'New match';
+        modeOptions.hidden = true;
+        startButton.hidden = false;
+        matchStatus.textContent = 'Match winner';
+        botStatus.textContent = playerWonRound ? 'Defeated' : 'Match winner';
         overlay.hidden = false;
         pauseButton.textContent = 'Pause';
       }
-      function triggerKoImpact() {
+      function triggerKoImpact(playerWonRound) {
         const body = document.body;
+        const loserCallout = document.querySelector(playerWonRound ? '#bot-ko-callout' : '#player-ko-callout');
         shell.classList.remove('ko-shake');
         body.classList.remove('ko-impact');
+        loserCallout.classList.remove('show');
         void shell.offsetWidth;
+        void loserCallout.offsetWidth;
         shell.classList.add('ko-shake');
         body.classList.add('ko-impact');
+        loserCallout.classList.add('show');
         window.setTimeout(() => {
           shell.classList.remove('ko-shake');
           body.classList.remove('ko-impact');
-        }, 650);
+        }, 900);
+        window.setTimeout(() => loserCallout.classList.remove('show'), 900);
       }
       function boardHeight(field) {
         let total = 0;
@@ -926,6 +1110,8 @@
         document.querySelector('#overlay-title').textContent = result === 'DRAW' ? 'DRAW' : (result === 'YOU WIN' ? 'MATCH WON' : 'MATCH LOST');
         document.querySelector('#overlay-copy').textContent = `Set ${playerWins} - ${botWins} · Score ${totalPlayerScore.toLocaleString()} - ${totalBotScore.toLocaleString()}. ${result === 'DRAW' ? 'Dead heat.' : result === 'YOU WIN' ? 'You take the battle.' : 'The bot takes the battle.'}`;
         startButton.textContent = 'New match';
+        modeOptions.hidden = true;
+        startButton.hidden = false;
         matchStatus.textContent = result === 'YOU WIN' ? 'Match winner' : result === 'DRAW' ? 'Draw' : 'Match lost';
         botStatus.textContent = result === 'YOU WIN' ? 'Defeated' : result === 'DRAW' ? 'Draw' : 'Match winner';
         overlay.hidden = false;
@@ -934,6 +1120,7 @@
         if (!running) return;
         paused = !paused;
         pauseButton.textContent = paused ? 'Resume' : 'Pause';
+        startButton.hidden = !paused;
         if (paused) {
           clearHeldControls();
           document.querySelector('#overlay-eyebrow').textContent = 'Take your time';
@@ -1041,9 +1228,11 @@
         if (!running || paused) return;
         lineClearEffects.forEach((effect) => { effect.elapsed += delta; });
         lineClearEffects = lineClearEffects.filter((effect) => effect.elapsed < 420);
-        matchElapsed += delta;
-        renderClock();
-        if (matchElapsed >= MATCH_LENGTH) { finishTimedMatch(); return; }
+        if (gameMode === 'versus') {
+          matchElapsed += delta;
+          renderClock();
+          if (matchElapsed >= MATCH_LENGTH) { finishTimedMatch(); return; }
+        }
         if (heldHorizontal) {
           horizontalElapsed += delta;
           const repeatDelay = horizontalRepeating ? 45 : 155;
@@ -1069,7 +1258,7 @@
             move(0, 1);
           }
         }
-        if (running && botCurrent) {
+        if (gameMode === 'versus' && running && botCurrent) {
           botElapsed += delta;
           botActionElapsed += delta;
           if (botElapsed > 120) botStatus.textContent = 'Placing';
@@ -1116,18 +1305,17 @@
       window.addEventListener('blur', clearHeldControls);
       startButton.addEventListener('click', () => {
         if (running && paused) { togglePause(); return; }
-        document.querySelector('#overlay-eyebrow').textContent = 'Ready when you are';
-        document.querySelector('#overlay-title').innerHTML = 'Stack<br>smart.';
-        document.querySelector('#overlay-copy').textContent = 'Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.';
-        startButton.textContent = 'Start knockout';
-        resetGame(roundNumber === 0 || matchComplete);
+        startButton.hidden = true;
+        const shouldResetMatch = roundNumber === 0 || isKnockoutReached();
+        resetGame(shouldResetMatch);
       });
+      versusButton.addEventListener('click', () => beginMode('versus'));
+      soloButton.addEventListener('click', () => beginMode('solo'));
+      menuButton.addEventListener('click', showMainMenu);
       pauseButton.addEventListener('click', togglePause);
       document.querySelector('#restart-button').addEventListener('click', () => {
-        document.querySelector('#overlay-eyebrow').textContent = 'Ready when you are';
-        document.querySelector('#overlay-title').innerHTML = 'Stack<br>smart.';
-        document.querySelector('#overlay-copy').textContent = 'Two-minute knockout. Chain clears and spin T-pieces to send bigger attacks.';
-        startButton.textContent = 'Start knockout';
+        modeOptions.hidden = true;
+        startButton.hidden = true;
         resetGame(true);
       });
       bestNode.textContent = String(best);
